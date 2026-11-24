@@ -89,6 +89,19 @@ class ChatApp(App):
         except Exception:
             pass
 
+        self.restored = False
+        if self.mem.get("meetings", 0) == 0 and not self.mem.get("facts"):
+            content = bot_core.read_backup()
+            if content:
+                try:
+                    d = json.loads(content)
+                    with open(bot_core.SAVE, "w", encoding="utf-8") as f:
+                        json.dump(d, f, ensure_ascii=False, indent=1)
+                    self.mem.update(d)
+                    self.restored = True
+                except Exception:
+                    pass
+
         root = BoxLayout(orientation="vertical", padding=dp(8), spacing=dp(6))
 
         # --- шапка ---
@@ -130,8 +143,25 @@ class ChatApp(App):
         self.state["watcher"] = self.watcher
         self.watcher.start()
         Clock.schedule_interval(self.tick_status, 5)
+        Clock.schedule_interval(self.check_reminders, 20)
         Clock.schedule_once(lambda dt: self.add_bubble(bot_core.greet(self.mem)), 0.1)
+        Clock.schedule_once(self.after_start, 0.8)
         return root
+
+    def after_start(self, dt):
+        """Авто-восстановление, запрос разрешений."""
+        if self.restored:
+            self.add_bubble(
+                f"Нашёл свой бэкап на GitHub и вспомнил всё: фактов "
+                f"{len(self.mem.get('facts', []))}, дней {len(self.mem.get('days', []))}.",
+                system=True)
+        try:
+            from android.permissions import request_permissions, Permission
+            request_permissions([Permission.RECORD_AUDIO,
+                                 Permission.CAMERA,
+                                 Permission.POST_NOTIFICATIONS])
+        except Exception:
+            pass
 
     # ---------- сообщения ----------
 
@@ -162,6 +192,17 @@ class ChatApp(App):
     def tick_status(self, dt):
         s = self.state["watcher"].state if self.state.get("watcher") else None
         self.net_label.text = "…" if s is None else ("сеть есть" if s else "офлайн")
+
+    def check_reminders(self, dt):
+        """Раз в 20 сек проверяем напоминания: сообщение в чат + системное уведомление."""
+        try:
+            fired = bot_core.due_reminders(self.mem)
+        except Exception:
+            return
+        for t in fired:
+            self.add_bubble(t, system=True)
+            bot_core.android_notify("Карманный Товарищ", t)
+            bot_core.save_mem(self.mem)
 
     def send(self, *a):
         text = self.inp.text.strip()

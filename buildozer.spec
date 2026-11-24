@@ -13,7 +13,7 @@ requirements = python3,kivy,pyjnius
 orientation = portrait
 fullscreen = 0
 
-android.permissions = INTERNET
+android.permissions = INTERNET, RECORD_AUDIO, CAMERA, POST_NOTIFICATIONS
 android.api = 33
 android.minapi = 21
 android.archs = arm64-v8a, armeabi-v7a
