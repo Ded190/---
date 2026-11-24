@@ -17,6 +17,10 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Pin JDK 17
+        run: |
+          echo "JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64" >> $GITHUB_ENV
+
       - name: Install buildozer and system deps
         run: |
           pip install buildozer cython==0.29.36
@@ -25,14 +29,11 @@ jobs:
 
       - name: Build APK
         shell: bash
-        env:
-          PIP_CONSTRAINT: pip<26
         run: |
           set -o pipefail
-          buildozer android debug 2>&1 | tee build.log
+          echo "pip<26" > pip-constraints.txt
+          PIP_CONSTRAINT="$PWD/pip-constraints.txt" buildozer android debug 2>&1 | tee build.log
 
-      # приём 400 строк: при падении сборки в конце страницы запуска
-      # печатается хвост лога — копируй оттуда без скроллинга
       - name: Show last error lines (400)
         if: failure()
         run: tail -n 400 build.log
