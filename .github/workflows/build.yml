@@ -27,19 +27,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zip openjdk-17-jdk autoconf automake libtool libltdl-dev pkg-config zlib1g-dev libffi-dev libssl-dev ccache
 
-      - name: Pre-accept Android SDK licenses
-        run: |
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          printf '8933bad161af4178b1185d1a37fbf41ea5269c55\n' > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          printf '24333f8a63b6825ea9c5514f83c2829b004d1fee\n' >> ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          printf '84831b9409646a918e30573bab4c9c91346d8abd\n' > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-
       - name: Build APK
         shell: bash
         run: |
-          set -o pipefail
           echo "pip<26" > pip-constraints.txt
-          PIP_CONSTRAINT="$PWD/pip-constraints.txt" buildozer android debug 2>&1 | tee build.log
+          PIP_CONSTRAINT="$PWD/pip-constraints.txt" yes | buildozer -v android debug > build.log 2>&1
 
       # приём 400 строк: при падении сборки в конце страницы запуска
       # печатается хвост лога — копируй оттуда без скроллинга
