@@ -28,6 +28,7 @@ ME = (0.23, 0.48, 0.84, 1)         # пузырь моих сообщений
 BOT = (0.17, 0.21, 0.26, 1)        # пузырь бота
 TEXT = (0.91, 0.93, 0.96, 1)
 MUTED = (0.62, 0.68, 0.76, 1)
+ACCENT = (0.45, 0.68, 0.95, 1)     # курсор ввода (светло-голубой)
 
 # Kivy не рисует цветные эмодзи — убираем их из ответов, чтобы не были квадратами
 EMOJI_RE = re.compile(
@@ -89,19 +90,7 @@ class ChatApp(App):
         except Exception:
             pass
 
-        self.restored = False
-        if self.mem.get("meetings", 0) == 0 and not self.mem.get("facts"):
-            content = bot_core.read_backup()
-            if content:
-                try:
-                    d = json.loads(content)
-                    with open(bot_core.SAVE, "w", encoding="utf-8") as f:
-                        json.dump(d, f, ensure_ascii=False, indent=1)
-                    self.mem.update(d)
-                    self.restored = True
-                except Exception:
-                    pass
-
+        self.restored = False   # восстановление с GitHub делаем в after_start, чтобы не тормозить запуск
         root = BoxLayout(orientation="vertical", padding=dp(8), spacing=dp(6))
 
         # --- шапка ---
@@ -149,7 +138,18 @@ class ChatApp(App):
         return root
 
     def after_start(self, dt):
-        """Авто-восстановление, запрос разрешений."""
+        """Авто-восстановление памяти с GitHub, затем запрос разрешений."""
+        if not self.restored and self.mem.get("meetings", 0) == 0 and not self.mem.get("facts"):
+            try:
+                content = bot_core.read_backup()
+                if content:
+                    d = json.loads(content)
+                    with open(bot_core.SAVE, "w", encoding="utf-8") as f:
+                        json.dump(d, f, ensure_ascii=False, indent=1)
+                    self.mem.update(d)
+                    self.restored = True
+            except Exception:
+                pass
         if self.restored:
             self.add_bubble(
                 f"Нашёл свой бэкап на GitHub и вспомнил всё: фактов "
@@ -239,5 +239,40 @@ class ChatApp(App):
         bot_core.save_mem(self.mem)
 
 
+def _crash_screen(err):
+    """Экран ошибки вместо молчаливого вылета: показывает traceback."""
+    Window.clearcolor = (0.18, 0.03, 0.03, 1)
+    root = BoxLayout(orientation="vertical", padding=dp(12), spacing=dp(8))
+    root.add_widget(Label(text="Упс, ошибка! Пришлите этот текст Алисе:", bold=True,
+                          font_size=sp(15), color=(1, 0.85, 0.85, 1),
+                          size_hint_y=None, height=dp(36)))
+    scr = ScrollView()
+    lbl = Label(text=err, font_size=sp(10), color=(1, 0.92, 0.92, 1), halign="left",
+                valign="top", size_hint_y=None, padding=[dp(8)] * 2)
+    lbl.bind(width=lambda i, s: setattr(i, "text_size", (s, None)))
+    lbl.bind(texture_size=lambda i, s: setattr(i, "height", s[1]))
+    scr.add_widget(lbl)
+    root.add_widget(scr)
+    Window.add_widget(root)
+
+
 if __name__ == "__main__":
-    ChatApp().run()
+    import time, traceback
+    try:
+        ChatApp().run()
+    except Exception:
+        err = traceback.format_exc()
+        # копия ошибки в файл (чёрный ящик)
+        try:
+            from datetime import datetime
+            with open(os.path.join(bot_core.DATA_DIR, "crash_log.txt"), "a", encoding="utf-8") as f:
+                f.write("\n=== " + datetime.now().strftime("%d.%m.%Y %H:%M:%S") + " ===\n" + err)
+        except Exception:
+            pass
+        # показать ошибку на экране и не закрывать приложение молча
+        try:
+            _crash_screen(err)
+            while True:
+                time.sleep(1)
+        except Exception:
+            pass
