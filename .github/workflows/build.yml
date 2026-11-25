@@ -27,11 +27,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zip openjdk-17-jdk autoconf automake libtool libltdl-dev pkg-config zlib1g-dev libffi-dev libssl-dev ccache
 
+      - name: Remember signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android
+          key: pocket-friend-signing-v1
+
       - name: Build APK
-        shell: bash
         run: |
+          rm -f bin/*.apk
           echo "pip<26" > pip-constraints.txt
-          PIP_CONSTRAINT="$PWD/pip-constraints.txt" yes | buildozer -v android debug > build.log 2>&1
+          export PIP_CONSTRAINT="$PWD/pip-constraints.txt"
+          yes | buildozer -v android debug > build.log 2>&1 || echo "buildozer вернул код $?, проверяем наличие APK"
+          if ls bin/*.apk >/dev/null 2>&1; then
+            echo "=== APK СОБРАН ==="
+            ls -la bin/
+          else
+            echo "=== APK НЕ СОБРАН ==="
+            tail -n 100 build.log
+            exit 1
+          fi
 
       # приём 400 строк: при падении сборки в конце страницы запуска
       # печатается хвост лога — копируй оттуда без скроллинга
@@ -44,3 +59,4 @@ jobs:
         with:
           name: pocket-friend-apk
           path: bin/*.apk
+
