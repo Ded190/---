@@ -131,8 +131,9 @@ class NetWatcher(threading.Thread):
     При ПЕРЕХОДЕ (появился/пропал) печатает уведомление и запоминает
     последнее событие, чтобы бот упомянул его в следующем ответе."""
 
-    def __init__(self, probe=None, interval=20):
+    def __init__(self, probe=None, interval=20, notify=None):
         super().__init__(daemon=True)
+        self.notify = notify
         self.probe = probe or self._default_probe
         self.interval = interval
         self.state = None            # None до первой проверки
@@ -163,12 +164,19 @@ class NetWatcher(threading.Thread):
     def run(self):
         while not self._stop.wait(self.interval):
             ev = self.check_once()
+            t = datetime.now().strftime("%H:%M")
             if ev == "up":
-                self.last_event = ("up", datetime.now().strftime("%H:%M"))
-                print("\n" + pick(NET_UP).format(t=self.last_event[1]) + "\n> ", flush=True)
+                self.last_event = ("up", t)
+                if self.notify:
+                    self.notify("up", t)
+                else:
+                    print("\n" + pick(NET_UP).format(t=t) + "\n> ", flush=True)
             elif ev == "down":
-                self.last_event = ("down", datetime.now().strftime("%H:%M"))
-                print("\n" + pick(NET_DOWN).format(t=self.last_event[1]) + "\n> ", flush=True)
+                self.last_event = ("down", t)
+                if self.notify:
+                    self.notify("down", t)
+                else:
+                    print("\n" + pick(NET_DOWN).format(t=t) + "\n> ", flush=True)
 
     def stop(self):
         self._stop.set()
@@ -931,3 +939,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
